@@ -1,0 +1,6 @@
+Polygonizer is a protocol tools that can generate polygons from implicit surfaces.
+Plan:
+	3D & 2D implicit surface polygonization
+	Focus on the geometric quality of simplex
+		Polygons are composed by well shape triangles(in 3D) or line segments(in 2D)
+		Not cubic marching method
