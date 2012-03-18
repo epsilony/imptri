@@ -5,84 +5,15 @@
     "Cermak M & Skala V.
     Polygonization of implicit surfaces with sharp features by edge-spinning.
     VISUAL COMPUTER (2005) 21: pp. 252-264." """
+from collections import deque
+from math import cos, acos, sqrt, pi
 
 import numpy as np
-from collections import deque
 from scipy.optimize import brentq
-from math import cos, acos, sin, sqrt, pi
 
+from imptri.tools import vec_len, norm_vec, intersec_angle, rotation_array, \
+    projection_to_plan, smallest_triangle_sphere 
 
-def norm_vec(vec):
-    """ Get the normalized vector of vec  """
-
-    return vec / sqrt(np.dot(vec, vec))
-
-
-def vec_len(vec):
-    """ Get the length of vec (Euclid norm of real vectors) """
-
-    return sqrt(np.dot(vec, vec))
-
-
-def projection_to_plan(vec,plan_normal):
-    return vec-np.dot(vec,plan_normal)*plan_normal/np.dot(plan_normal,plan_normal)
-
-
-def rotation_array(theta, u):
-    """ 
-    Returns an array type rotation matrix
-    
-    Rotation matrix from an axis and angle, the matrix for a rotation by an 
-    angle of theta about an axis in the direction u
-
-    How to use:
-    >>>m=rotation_array(theta,u)
-    >>>v_rotated=m.dot(v_to_be_rotated)
-    """
-
-    # SEE: http://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
-
-    u = norm_vec(u)
-    cosvl = cos(theta)
-    sinvl = sin(theta)
-    mat = np.diag((cosvl, cosvl, cosvl)) + sinvl * np.array(
-       ((0, -u[2],u[1]), (u[2], 0, -u[0]), (-u[1], u[0], 0))) \
-        + (1 - cosvl) * np.outer(u, u)
-    return mat
-
-
-def intersec_angle(vec1, vec2):
-    return acos(np.dot(vec1, vec2) / vec_len(vec1) / vec_len(vec2))
-
-
-def circum(pa, pb, pc):
-    a = vec_len(pb - pc)
-    b = vec_len(pa - pc)
-    c = vec_len(pa - pb)
-    r = a * b * c / sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a
-                         + b - c))
-
-    # barycentric coordinates
-
-    bc = (a * a * (-a * a + b * b + c * c), b * b * (a * a - b * b + c
-          * c), c * c * (a * a + b * b - c * c))
-    center = np.array(bc[0] * pa + bc[1] * pb + bc[2] * pc)
-    return (r, center)
-
-
-# def is_circle_cross_segment(center,r,p1,p2):
-#    v12=p2-p1
-#    vc1=p1-center
-#    if vec_len(vc1)<=r or vec_len(p2-center)<=r:
-#        return True
-#    #parameter for the center's neareat point on line (p2-p1)*t+p1
-#    t=v12.dot(vc1)/v12.dot(v12)
-#    if t<0 or t>1:
-#        return False
-#    elif vec_len(p1*(1-t)+p2*t-center)<=r:
-#        return True
-#    else:
-#        return False
 
 class _WingedEdge(object):
 
@@ -106,12 +37,6 @@ class _WingedEdge(object):
         self.tri_pt
         self.pred = None
         self.succ = None
-
-
-# class _IndexedTriangle(object):
-#    def __init__(self,points,indes):
-#        self.points=points
-#        self.indes=indes
 
 class CSTri(object):
 
@@ -209,16 +134,16 @@ class CSTri(object):
 
             if alpha == alpha1:
                 case = 1
-                (r, center) = circum(p1, p2, e.pred.start)
+                (r, center) = smallest_triangle_sphere(p1, p2, e.pred.start)
             else:
                 case = 2
-                (r, center) = circum(p1, p2, e.succ.end)
+                (r, center) = smallest_triangle_sphere(p1, p2, e.succ.end)
         elif pnew is None:
             r = vec_len(v12)
             center = (p1 + p2) * 0.5
             case = 3
         else:
-            (r, center) = circum(p1, p2, pnew)
+            (r, center) = smallest_triangle_sphere(p1, p2, pnew)
             center = r * self.distance_test_c
             case = 4
 
@@ -258,11 +183,11 @@ class CSTri(object):
             if alpha_m1 < alpha_m2:
                 te = _WingedEdge(e.start, emin1.end)
                 exceptions = (emin1, emin2, e.pred)
-                (r, center) = circum(e.start, emin2.start, emin2.end)
+                (r, center) = smallest_triangle_sphere(e.start, emin2.start, emin2.end)
             else:
                 te = _WingedEdge(emin1.start, e.end)
                 exceptions = (emin1, emin1.pred)
-                (r, center) = circum(e.end, emin1.start, emin1.end)
+                (r, center) = smallest_triangle_sphere(e.end, emin1.start, emin1.end)
             t_emin = self._distance_test(te, r, center, exceptions)
 
             if t_emin is not None:
