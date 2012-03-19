@@ -5,14 +5,15 @@
     "Cermak M & Skala V.
     Polygonization of implicit surfaces with sharp features by edge-spinning.
     VISUAL COMPUTER (2005) 21: pp. 252-264." """
+
 from collections import deque
 from math import cos, acos, sqrt, pi
 
 import numpy as np
 from scipy.optimize import brentq
 
-from imptri.tools import vec_len, norm_vec, intersec_angle, rotation_array, \
-    projection_to_plan, smallest_triangle_sphere 
+from imptri.tools import vec_len, norm_vec, intersec_angle, \
+    rotation_array, projection_to_plan, smallest_triangle_sphere
 
 
 class _WingedEdge(object):
@@ -37,6 +38,7 @@ class _WingedEdge(object):
         self.tri_pt
         self.pred = None
         self.succ = None
+
 
 class CSTri(object):
 
@@ -74,7 +76,7 @@ class CSTri(object):
         self.rmin = rmax * 0.1
         self.surf_curv_coef = k * sqrt(2 * (1 - cos(alpha_err)))
         self.delt_alpha = delt_alpha
-        self.alpha_lim = alpha_lim
+        self.alpha_lim = abs(alpha_lim)
         self.sharp_search_delta = sharp_search_delta
         self.alpha_shape_min = pi / 6
         self.alpha_shape_big = 2 * pi / 3
@@ -96,16 +98,18 @@ class CSTri(object):
         e = self.ale.popleft()
         p1 = e.start
         p2 = e.end
+        p_s=(p1+p2)/2.0
+        grd_s=norm_vec(self.func_gd(p_s))
         pold = e.tri_pt
         v12 = p2 - p1
         grd_old = np.cross(v12, pold - p2)
 
         # not like Cermak2005!!!
-
         c = vec_len(grd_old) / vec_len(v12)
 
         pnew = self.edge_spining(p1, p2, grd_old, c)
-
+        if pnew is not None and  not self.check_alpha_lim(self.func(p_s),pnew,False):
+            pnew = self.sharp_feature_seek(p_s,grd_s,v12,pnew)
         v_succ = e.succ.end - e.end
         v_pred = e.start - e.pred.start
         alpha2 = intersec_angle(v_succ, -v12)
@@ -134,10 +138,12 @@ class CSTri(object):
 
             if alpha == alpha1:
                 case = 1
-                (r, center) = smallest_triangle_sphere(p1, p2, e.pred.start)
+                (r, center) = smallest_triangle_sphere(p1, p2,
+                        e.pred.start)
             else:
                 case = 2
-                (r, center) = smallest_triangle_sphere(p1, p2, e.succ.end)
+                (r, center) = smallest_triangle_sphere(p1, p2,
+                        e.succ.end)
         elif pnew is None:
             r = vec_len(v12)
             center = (p1 + p2) * 0.5
@@ -183,11 +189,13 @@ class CSTri(object):
             if alpha_m1 < alpha_m2:
                 te = _WingedEdge(e.start, emin1.end)
                 exceptions = (emin1, emin2, e.pred)
-                (r, center) = smallest_triangle_sphere(e.start, emin2.start, emin2.end)
+                (r, center) = smallest_triangle_sphere(e.start,
+                        emin2.start, emin2.end)
             else:
                 te = _WingedEdge(emin1.start, e.end)
                 exceptions = (emin1, emin1.pred)
-                (r, center) = smallest_triangle_sphere(e.end, emin1.start, emin1.end)
+                (r, center) = smallest_triangle_sphere(e.end,
+                        emin1.start, emin1.end)
             t_emin = self._distance_test(te, r, center, exceptions)
 
             if t_emin is not None:
@@ -260,6 +268,7 @@ class CSTri(object):
         center,
         exceptions=None,
         ):
+
         e_grd = (self.func_gd(e.start) + self.func_gd(e.end)) / 2.0
         (min_dis, emin) = (None, None)
         if exceptions is None:
@@ -341,17 +350,17 @@ class CSTri(object):
         # MARK: alpha_n_assuming see self.edge_polygon
         # Estimation of the circle radius(S6.1), r2
 
-        ps = (p1 + p2) / 2.0
+        p_s = (p1 + p2) / 2.0
         d12 = norm_vec(p2 - p1)
         vinit = norm_vec(np.cross(d12, grd_old))
-        pinit = ps + vinit * c
+        pinit = p_s + vinit * c
         grd1 = norm_vec(self.func_gd(p1))
         grd2 = norm_vec(self.func_gd(p2))
-        grds = norm_vec(self.func_gd(ps))
+        grd_s = norm_vec(self.func_gd(p_s))
         grdinit = norm_vec(self.func_gd(pinit))
         rc1 = vec_len(p1 - pinit) / acos(grd1.dot(grdinit))
         rc2 = vec_len(p2 - pinit) / acos(grd2.dot(grdinit))
-        rcs = vec_len(ps - pinit) / acos(grds.dot(grdinit))
+        rcs = vec_len(p_s - pinit) / acos(grd_s.dot(grdinit))
         rc = min(rc1, rc2, rcs)
         r2 = rc * self.surf_curv_coef
         if r2 < self.rmin:
@@ -363,10 +372,10 @@ class CSTri(object):
         #   determine init point pnew, init search direction of rotation
 
         vnew = vinit * r2
-        pnew = ps + vnew
+        pnew = p_s + vnew
         rot_mat = rotation_array(self.delt_alpha, d12)
-        vnew2 = rot_mat * vnew.reshape(3, 1)
-        pnew2 = vnew2 + ps
+        vnew2 = rot_mat.dot(vnew)
+        pnew2 = vnew2 + p_s
         func_val2 = self.func(pnew2)
         func_val = self.func(pnew)
         delta = self.delt_alpha
@@ -374,17 +383,16 @@ class CSTri(object):
             delta = -delta
             rot_mat = rotation_array(-self.delt_alpha, d12)
             vnew2 = rot_mat * vnew.reshape(3, 1)
-            pnew2 = vnew2 + ps
+            pnew2 = vnew2 + p_s
             func_val2 = self.func(pnew2)
         alpha = delta
 
         #   find the sign different interval
-
         while func_val * func_val2 > 0:
             func_val = func_val2
-            vnew2 = rot_mat * vnew2.reshape(3, 1)
+            vnew2 = rot_mat.dot(vnew2)
             pnew = pnew2
-            pnew2 = vnew2 + ps
+            pnew2 = vnew2 + p_s
             func_val2 = self.func(pnew2)
             alpha += delta
             if abs(alpha) > self.alpha_lim:
@@ -396,51 +404,53 @@ class CSTri(object):
         rslt = brentq(lambda t: self.func(pnew * (1 - t) + pnew2 * t),
                       0, 1)
         pnew = pnew * (1 - rslt) + pnew2 * rslt
+        return pnew
 
-        # check edge alpha limitation
-
-        grdnew = norm_vec(self.func_gd(pnew))
-        if acos(np.dot(grdnew, grds)) < self.alpha_lim_edge:
-            return pnew
+    def sharp_feature_seek(self,p_s,grd_s,plan_norm,p_failed):
 
         # sharp edge situation (S6.3)
         #   algorithm 4,
-        #       pnew: init search point
-        #       v1:norm vector, points to pnew', starts from ps,
-        #           alongs the cross line of t1 and circle plan,
-        #       v2:norm vector, points to pnew', starts from pnew,
-        #           alongs the cross line of t2 and circle plan
-        #       pnew algorithm is not mentioned in Cermak2005,
-        #       the realization below is numerical robust, c.f. the detail
-        #       in http://epsilony.net/wiki/ImpTri/SCmethod#pnew
-
-        v1 = norm_vec(np.cross(d12, grds))
-        v2 = norm_vec(np.cross(grdnew, d12))
-        vns = ps - pnew
-        v12 = np.dot(v1, v2)
-        t = 1.0 - v12 * v12
-        tx = np.dot(vns, v1 - v12 * v2) / t
-        ty = np.dot(vns, v1 * v12 - v2) / t
-        pnew = (ps + v1 * tx + pnew + v2 * ty) / 2.0
-
-        self._search_root_on_plane(pnew, d12)
-
-        # pnew maybe not satisfy line alpha limit, that's seams reasonable,
+        #       p_failed: pnew reture by self.edge_spining but failed to pass
+        #                 _check_alpha_lim
+        pinit=self._sharp_feature_init(p_s,grd_s,plan_norm,p_failed)
+        pnew=self._search_root_on_plane(pinit, plan_norm)
+        
+        # p_failed maybe not satisfy line alpha limit, that's seams reasonable,
         # near a sharp edge the surface normal vector shifts very quickly.
-
+        
         return pnew
 
-    def _search_root_on_plane(self, pnew, plane_norm):
+    def _sharp_feature_init(self,p_s,grd_s,plan_norm,p_failed):
+        
+        #       v1:norm vector, points to p_failed', starts from p_s,
+        #           alongs the cross line of t1 and circle plan,
+        #       v2:norm vector, points to p_failed', starts from p_failed,
+        #           alongs the cross line of t2 and circle plan
+        #       pinit algorithm is not mentioned in Cermak2005,
+        #       the realization below is numerical robust, c.f. the detail
+        #       in http://epsilony.net/wiki/ImpTri/SCmethod#p_failed
+        grd_failed=self.func_gd(p_failed)
+        v1 = norm_vec(np.cross(plan_norm, grd_s))
+        v2 = norm_vec(np.cross(grd_failed, plan_norm))
+        vns = p_s - p_failed
+        c12 = np.dot(v1, v2)
+        t = 1.0 - c12 * c12
+        tx = np.dot(vns, v1 - c12 * v2) / t
+        ty = np.dot(vns, v1 * c12 - v2) / t
+        pinit = (p_s + v1 * tx + p_failed + v2 * ty) / 2.0
+        return pinit
+
+    def _search_root_on_plane(self, pnew, plane_norm,normed=True):
 
         # MARK: alpha_n_assuming see also self.edge_polygon
         # in Cermak2005 it is not directly presented
         # that grdnew should in the circle plan,
         # but the Neighborhood test in S7.1 assumed that.
-
+        if not normed:
+            plane_norm=norm_vec(plane_norm)
+        
         grdnew = self.func_gd(pnew)
-        plane_norm = norm_vec(plane_norm)
-        grdnew = norm_vec(grdnew - np.dot(grdnew, plane_norm)
-                          * plane_norm)
+        grdnew = projection_to_plan(grdnew,plan_norm)
         func_val = self.func_gd(pnew)
         delta = self.sharp_search_delta * -cmp(func_val, 0)
         pnew2 = pnew + delta * grdnew
@@ -456,6 +466,18 @@ class CSTri(object):
                       0, 1)
         pnew = pnew * (1 - rslt) + pnew2 * rslt
         return pnew
+
+    def check_alpha_lim(self,grd,pnew,normed=True):
+        if normed:
+            grdnew = norm_vec(self.func_gd(pnew))
+            if intersec_angle(grdnew,grd,True) < self.alpha_lim_edge:
+                return True
+        else:
+            grdnew= self.func_gd(pnew)
+            if intersec_angle(grdnew,grd) < self.alpha_lim_edge:
+                return True
+        return False
+
 
     def first_triangle(self, p0, c):
         self.ale.clear()
@@ -481,5 +503,3 @@ class CSTri(object):
         e2.pred = e1
         e2.succ = e0
         self.ale.extend((e0, e1, e2))
-
-

@@ -1,24 +1,36 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 from math import sqrt, cos, sin, acos
 import numpy as np
 
 
-def is_circle_cross_segment(center,r,p1,p2):
-   v12=p2-p1
-   vc1=p1-center
-   if vec_len(vc1)<=r or vec_len(p2-center)<=r:
-       return True
-   #parameter for the center's neareat point on line (p2-p1)*t+p1
-   t=v12.dot(vc1)/v12.dot(v12)
-   if t<0 or t>1:
-       return False
-   elif vec_len(p1*(1-t)+p2*t-center)<=r:
-       return True
-   else:
-       return False
+def is_circle_cross_segment(
+    center,
+    r,
+    p1,
+    p2,
+    ):
+    v12 = p2 - p1
+    vc1 = p1 - center
+    if vec_len(vc1) <= r or vec_len(p2 - center) <= r:
+        return True
+
+   # parameter for the center's neareat point on line (p2-p1)*t+p1
+
+    t = v12.dot(vc1) / v12.dot(v12)
+    if t < 0 or t > 1:
+        return False
+    elif vec_len(p1 * (1 - t) + p2 * t - center) <= r:
+        return True
+    else:
+        return False
 
 
-def intersec_angle(vec1, vec2):
-    return acos(np.dot(vec1, vec2) / vec_len(vec1) / vec_len(vec2))
+def intersec_angle(vec1, vec2,normed=False):
+    if normed:
+        return acos(np.dot(vec1,vec2))
+    else:
+        return acos(np.dot(vec1, vec2) / vec_len(vec1) / vec_len(vec2))
 
 
 def rotation_array(theta, u):
@@ -38,14 +50,15 @@ def rotation_array(theta, u):
     u = norm_vec(u)
     cosvl = cos(theta)
     sinvl = sin(theta)
-    mat = np.diag((cosvl, cosvl, cosvl)) + sinvl * np.array(
-       ((0, -u[2],u[1]), (u[2], 0, -u[0]), (-u[1], u[0], 0))) \
-        + (1 - cosvl) * np.outer(u, u)
+    mat = np.diag((cosvl, cosvl, cosvl)) + sinvl * np.array(((0, -u[2],
+            u[1]), (u[2], 0, -u[0]), (-u[1], u[0], 0))) + (1 - cosvl) \
+        * np.outer(u, u)
     return mat
 
 
-def projection_to_plan(vec,plan_normal):
-    return vec-np.dot(vec,plan_normal)*plan_normal/np.dot(plan_normal,plan_normal)
+def projection_to_plan(vec, plan_normal):
+    return vec - np.dot(vec, plan_normal) * plan_normal \
+        / np.dot(plan_normal, plan_normal)
 
 
 def vec_len(vec):
@@ -67,37 +80,48 @@ def circum(pa, pb, pc):
     b = vec_len(vb)
     vc = pa - pb
     c = vec_len(vc)
-    area_4_times = sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a + b - c))
+    area_4_times = sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a
+                        + b - c))
     r = a * b * c / area_4_times
 
     # barycentric coordinates
-    bc = np.array((a*a*np.dot(vc,-vb),b*b*np.dot(-vc,va),c*c*np.dot(vb,-va))) \
-        /(area_4_times*area_4_times*0.5)
+
+    bc = np.array((a * a * np.dot(vc, -vb), b * b * np.dot(-vc, va), c
+                  * c * np.dot(vb, -va))) / (area_4_times
+            * area_4_times * 0.5)
     center = bc[0] * pa + bc[1] * pb + bc[2] * pc
     return (r, center)
 
-def smallest_triangle_sphere(pa,pb,pc):
-   #if find bugs here must examine the circum
+
+def smallest_triangle_sphere(pa, pb, pc):
+
+   # if find bugs here must examine the circum
+
     va = pb - pc
     a = vec_len(va)
     vb = pc - pa
     b = vec_len(vb)
     vc = pa - pb
     c = vec_len(vc)
-    tt=[a,b,c]
-    max_abc=max(tt)
+    tt = [a, b, c]
+    max_abc = max(tt)
     tt.remove(max_abc)
-    if max_abc*max_abc >= np.dot(tt,tt):
-       r=max_abc/2.0
-       tt=(a,b,c)
-       i=tt.index(max_abc)
-       center=(pb+pc,pa+pc,pa+pb)[i]/2.0
-       return (r,center)
-    area_4_times = sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a + b - c))
+    if max_abc * max_abc >= np.dot(tt, tt):
+        r = max_abc / 2.0
+        tt = (a, b, c)
+        i = tt.index(max_abc)
+        center = (pb + pc, pa + pc, pa + pb)[i] / 2.0
+        return (r, center)
+    area_4_times = sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a
+                        + b - c))
     r = a * b * c / area_4_times
 
     # barycentric coordinates
-    bc = np.array((a*a*np.dot(vc,-vb),b*b*np.dot(-vc,va),c*c*np.dot(vb,-va))) \
-        /(area_4_times*area_4_times*0.5)
+
+    bc = np.array((a * a * np.dot(vc, -vb), b * b * np.dot(-vc, va), c
+                  * c * np.dot(vb, -va))) / (area_4_times
+            * area_4_times * 0.5)
     center = bc[0] * pa + bc[1] * pb + bc[2] * pc
     return (r, center)
+
+
