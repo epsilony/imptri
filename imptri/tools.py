@@ -57,8 +57,8 @@ def rotation_array(theta, u):
 
 
 def projection_to_plan(vec, plan_normal):
-    return vec - np.dot(vec, plan_normal) * plan_normal \
-        / np.dot(plan_normal, plan_normal)
+    plan_normal=norm_vec(plan_normal)
+    return vec - np.dot(vec, plan_normal) * plan_normal
 
 
 def vec_len(vec):
