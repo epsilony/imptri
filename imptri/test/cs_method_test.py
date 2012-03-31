@@ -22,18 +22,18 @@ def test_edge_spining():
     p2=v2+center
     pold=v3+center
     c=0.1
-    pnew=samp.edge_spining(p1,p2,np.cross(p1-p2,pold-p2),c)
+    pnew=samp.spining_search(p1,p2,np.cross(p1-p2,pold-p2),c)
 
     feqok_(vec_len(pnew-p1),vec_len(pnew-p2),tol)
     feqok_(np.dot(pnew-(p1+p2)/2,p1-p2),0,tol*vec_len(p1-p2))
     
     samp=sphere_CSTri(center=center,r=r,is_hole=True)
-    pnew=samp.edge_spining(p1,p2,np.cross(p1-p2,pold-p2),c)
+    pnew=samp.spining_search(p1,p2,np.cross(p1-p2,pold-p2),c)
     feqok_(vec_len(pnew-p1),vec_len(pnew-p2),tol)
     feqok_(np.dot(pnew-(p1+p2)/2,p1-p2),0,tol*vec_len(p1-p2))
     
     c_fail=r*100
-    pnew=samp.edge_spining(p1,p2,np.cross(p1-p2,pold-p2),c_fail)
+    pnew=samp.spining_search(p1,p2,np.cross(p1-p2,pold-p2),c_fail)
 
 
 def illustrate():

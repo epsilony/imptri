@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-from math import sqrt, cos, sin, acos
+from math import sqrt, cos, sin, acos, pi
 import numpy as np
 
 
@@ -25,6 +25,15 @@ def is_circle_cross_segment(
     else:
         return False
 
+def rb_acos(v):
+    if v > 1.000001 or v < -1.000001:
+        raise ValueError()
+    if v>1:
+        return 0
+    elif v<1:
+        return pi
+    else:
+        return acos(v)
 
 def intersec_angle(vec1, vec2,normed=False):
     if normed:
